@@ -17,43 +17,25 @@ from typing_extensions import TypedDict
 
 
 class CandidateProfile(TypedDict, total=False):
-    """기업 기본 정보"""
+    """기업 기본 정보 (Agent 0 출력)"""
 
     name: str
-    tagline: str
-    summary: str
     founded_year: int
-    ceo_name: str
-    headquarters: str
-    employee_count: int
-    website: str
     business_description: str
 
 
 class SpaceOperations(TypedDict, total=False):
-    """우주산업 특화 정보"""
+    """우주산업 특화 정보 (Agent 0 출력)"""
 
-    satellites_deployed: int
-    satellites_planned: int
-    satellite_names: List[str]
-    payload_type: str
-    orbit_type: str
-    launch_status: str
-    ground_stations: int
     main_technology: List[str]
-    industry_sector: str
 
 
 class FundingSnapshot(TypedDict, total=False):
-    """투자 및 파트너십"""
+    """투자 및 파트너십 (Agent 0 출력)"""
 
     stage: str
     total_funding_krw: float
-    last_funding_date: str
-    major_investors: List[str]
     partners: List[str]
-    products: List[str]
-    customers: List[str]
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -187,6 +169,10 @@ class InvestmentState(TypedDict, total=False):
     decision: DecisionSummary
     report: ReportBundle
     meta: PipelineMeta
+
+    # Scorer 결과
+    score: float
+    score_breakdown: Dict[str, float]
 
 
 # ═══════════════════════════════════════════════════════════════════════════

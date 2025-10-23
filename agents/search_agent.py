@@ -37,6 +37,14 @@ try:
 except ImportError:
     GoogleNews = None
 
+try:
+    from langchain.output_parsers import StructuredOutputParser, ResponseSchema
+    from langchain.prompts import ChatPromptTemplate
+except ImportError:
+    StructuredOutputParser = None
+    ResponseSchema = None
+    ChatPromptTemplate = None
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 설정
@@ -233,7 +241,6 @@ class SpaceCompanyFinder:
         # 기본 기업 사용
         company = self.config.DEFAULT_COMPANY
         print(f"\n✓ 대상 기업: {company}")
-
         return company
 
     # ═══════════════════════════════════════════════════════════════════════
@@ -249,8 +256,6 @@ class SpaceCompanyFinder:
         profile = {
             "name": company,
             "founded_year": None,
-            "ceo_name": None,
-            "headquarters": None,
             "business_description": "",
         }
 
@@ -267,45 +272,23 @@ class SpaceCompanyFinder:
             all_text += text
             print(f"  → {len(text)}자")
 
-        # LLM 추출
+        # LLM 추출 (설립연도만)
         if self.llm and all_text.strip():
-            print("\n[LLM] 정보 추출...")
+            print("\n[LLM] 설립연도 추출...")
             try:
-                prompt = f"""다음 텍스트에서 '{company}'의 정보를 추출하세요.
-
-**출력 형식 (JSON):**
-{{
-  "founded_year": 2015,
-  "ceo_name": "박재필",
-  "headquarters": "대전광역시"
-}}
-
-정보 없으면 null.
-
-텍스트:
-{all_text[:2000]}
-"""
+                prompt = f"'{company}'의 설립연도를 찾으세요. 숫자만 출력 (예: 2015):\n\n{all_text[:1500]}"
                 response = self.llm.invoke(prompt)
-                content = response.content.strip()
-                content = re.sub(r"```json\s*", "", content)
-                content = re.sub(r"```\s*", "", content)
-
-                data = json.loads(content)
-                if data.get("founded_year"):
-                    year = int(data["founded_year"])
+                year_str = response.content.strip()
+                match = re.search(r"(\d{4})", year_str)
+                if match:
+                    year = int(match.group(1))
                     if 2010 <= year <= 2024:
                         profile["founded_year"] = year
                         print(f"  ✓ 설립: {year}")
-                if data.get("ceo_name"):
-                    profile["ceo_name"] = str(data["ceo_name"]).strip()
-                    print(f"  ✓ CEO: {profile['ceo_name']}")
-                if data.get("headquarters"):
-                    profile["headquarters"] = str(data["headquarters"]).strip()
-                    print(f"  ✓ 본사: {profile['headquarters']}")
             except Exception as e:
                 print(f"  ⚠️ LLM 실패: {e}")
 
-        # 정규식 fallback
+        # 정규식 fallback (설립연도만)
         if not profile["founded_year"]:
             print("\n[정규식] 설립연도...")
             patterns = [
@@ -322,39 +305,6 @@ class SpaceCompanyFinder:
                         print(f"  → {year}년")
                         break
                 if profile["founded_year"]:
-                    break
-
-        if not profile["ceo_name"]:
-            print("\n[정규식] CEO...")
-            patterns = [
-                r"대표[이사]*\s*[:]?\s*([가-힣]{2,4})",
-                r"CEO\s*[:]?\s*([가-힣]{2,4})",
-                r"([가-힣]{2,4})\s*대표",
-            ]
-            exclude = ["회사", "기업", "법인", "주식", "스페이스", "테크", "솔루션"]
-
-            for pattern in patterns:
-                matches = re.findall(pattern, all_text)
-                for match in matches:
-                    name = match.strip()
-                    if name not in exclude and len(name) >= 2:
-                        profile["ceo_name"] = name
-                        print(f"  → {name}")
-                        break
-                if profile["ceo_name"]:
-                    break
-
-        if not profile["headquarters"]:
-            print("\n[정규식] 본사...")
-            patterns = [
-                r"본사\s*[:]?\s*([가-힣]+[시도])",
-                r"소재지\s*[:]?\s*([가-힣]+[시도])",
-            ]
-            for pattern in patterns:
-                match = re.search(pattern, all_text)
-                if match:
-                    profile["headquarters"] = match.group(1).strip()
-                    print(f"  → {profile['headquarters']}")
                     break
 
         # 사업 설명
@@ -378,14 +328,13 @@ class SpaceCompanyFinder:
         print("=" * 80)
 
         space = {
-            "satellites_deployed": None,
             "main_technology": [],
         }
 
         queries = [
-            f"{company} 위성 발사 몇기",
-            f"{company} 큐브위성 운용",
-            f"{company} 나무위키 위성",
+            f"{company} 큐브위성 기술",
+            f"{company} 위성 영상분석",
+            f"{company} 우주산업 기술",
         ]
 
         all_text = ""
@@ -395,35 +344,7 @@ class SpaceCompanyFinder:
             all_text += text
             print(f"  → {len(text)}자")
 
-        # 위성 수 - LLM 우선
-        print("\n[LLM] 위성 수 추출...")
-        if self.llm and all_text.strip():
-            try:
-                prompt = f"'{company}'가 발사하거나 운용 중인 위성 수를 찾으세요. 숫자만 출력 (예: 3):\n\n{all_text[:1000]}"
-                response = self.llm.invoke(prompt)
-                count_str = response.content.strip()
-                match = re.search(r"\d+", count_str)
-                if match:
-                    count = int(match.group())
-                    if 1 <= count <= 50:
-                        space["satellites_deployed"] = count
-                        print(f"  ✓ 위성 {count}기")
-            except Exception as e:
-                print(f"  ⚠️ LLM 실패: {e}")
-
-        # 정규식 fallback
-        if not space["satellites_deployed"]:
-            print("\n[정규식] 위성 수...")
-            counts = []
-            for num in range(1, 50):
-                patterns = [f"{num}기", f"{num}개", f"{num}대"]
-                if any(p in all_text for p in patterns):
-                    counts.append(num)
-            if counts:
-                space["satellites_deployed"] = max(counts)
-                print(f"  → {max(counts)}기")
-
-        # 기술 키워드
+        # 기술 키워드 추출
         print("\n[분석] 기술 스택...")
         text_lower = all_text.lower()
         for keyword in self.config.SPACE_TECH_KEYWORDS:
@@ -431,7 +352,7 @@ class SpaceCompanyFinder:
                 space["main_technology"].append(keyword)
 
         if space["main_technology"]:
-            print(f"  → {', '.join(space['main_technology'][:3])}")
+            print(f"  → {', '.join(space['main_technology'][:5])}")
 
         return space
 
@@ -530,41 +451,27 @@ class SpaceCompanyFinder:
         print("✅ Agent 0 완료")
         print("=" * 80)
         print(f"📌 기업: {profile.get('name')}")
-        print(
-            f"📅 설립: {profile.get('founded_year')}년"
-            if profile.get("founded_year")
-            else "📅 설립: -"
-        )
-        print(
-            f"👤 CEO: {profile.get('ceo_name')}"
-            if profile.get("ceo_name")
-            else "👤 CEO: -"
-        )
-        print(
-            f"📍 본사: {profile.get('headquarters')}"
-            if profile.get("headquarters")
-            else "📍 본사: -"
-        )
-        print(
-            f"🛰️ 위성: {space.get('satellites_deployed')}기"
-            if space.get("satellites_deployed")
-            else "🛰️ 위성: -"
-        )
-        print(
-            f"💰 투자: {funding.get('total_funding_krw')}억 ({funding.get('stage')})"
-            if funding.get("total_funding_krw")
-            else f"💰 투자: {funding.get('stage')}"
-        )
-        print(
-            f"🔬 기술: {', '.join(space.get('main_technology', [])[:3])}"
-            if space.get("main_technology")
-            else "🔬 기술: -"
-        )
-        print(
-            f"🤝 파트너: {', '.join(funding.get('partners', [])[:3])}"
-            if funding.get("partners")
-            else "🤝 파트너: -"
-        )
+
+        # 정보가 있는 항목만 출력
+        if profile.get("founded_year"):
+            print(f"📅 설립: {profile.get('founded_year')}년")
+
+        # 투자 정보
+        if funding.get("total_funding_krw") and funding.get("stage"):
+            print(
+                f"💰 투자: {funding.get('total_funding_krw')}억 ({funding.get('stage')})"
+            )
+        elif funding.get("total_funding_krw"):
+            print(f"💰 투자: {funding.get('total_funding_krw')}억")
+        elif funding.get("stage"):
+            print(f"💰 투자: {funding.get('stage')}")
+
+        if space.get("main_technology"):
+            print(f"🔬 기술: {', '.join(space.get('main_technology', [])[:5])}")
+
+        if funding.get("partners"):
+            print(f"🤝 파트너: {', '.join(funding.get('partners', [])[:3])}")
+
         print(f"📊 품질: {state['meta']['data_quality']}")
         print("=" * 80)
 

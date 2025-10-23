@@ -7,13 +7,31 @@ Agent 1: 성장성 분석 에이전트.
 
 from __future__ import annotations
 
-import math
+import os
 import re
+import requests
 from copy import deepcopy
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol
 
-from graph.state import GrowthOutcome, GrowthSignals, InvestmentState, create_initial_state
+from dotenv import load_dotenv
+
+from graph.state import (
+    GrowthOutcome,
+    GrowthSignals,
+    InvestmentState,
+    create_initial_state,
+)
+
+# .env 로드
+current_dir = Path(__file__).resolve().parent
+project_root = current_dir.parent
+env_path = project_root / ".env"
+if env_path.exists():
+    load_dotenv(dotenv_path=env_path)
+else:
+    load_dotenv()
 
 try:  # pragma: no cover - 선택적 의존성
     from tools.news_search import search_keyword as default_search_keyword
@@ -29,8 +47,7 @@ except Exception:  # pragma: no cover
 class SearchProvider(Protocol):
     """외부 검색 도구 인터페이스."""
 
-    def __call__(self, query: str, max_results: int = 5) -> List[Dict[str, Any]]:
-        ...
+    def __call__(self, query: str, max_results: int = 5) -> List[Dict[str, Any]]: ...
 
 
 @dataclass
@@ -66,25 +83,24 @@ class GrowthAgent:
         search: Optional[SearchProvider] = None,
         config: Optional[GrowthAgentConfig] = None,
         knowledge: Optional[Dict[str, Any]] = None,
+        dart_api_key: Optional[str] = None,
     ) -> None:
         self.config = config or GrowthAgentConfig()
         self.search = search or self._default_search
         self.knowledge = knowledge or self._load_knowledge()
+        self.dart_api_key = dart_api_key or os.getenv("DART_API_KEY")
 
         default_thresholds = {"우수": 0.10, "양호": 0.05, "경고": 0.01}
-        self.growth_thresholds = (
-            (self.knowledge or {}).get("growth_thresholds") or default_thresholds
-        )
-        self.pmf_signals = (
-            (self.knowledge or {}).get("pmf_signals")
-            or [
-                "고객이 제품을 찾아옴",
-                "언론이 연락함",
-                "입소문이 발생함",
-                "채용 수요 급증",
-                "주문 폭주",
-            ]
-        )
+        self.growth_thresholds = (self.knowledge or {}).get(
+            "growth_thresholds"
+        ) or default_thresholds
+        self.pmf_signals = (self.knowledge or {}).get("pmf_signals") or [
+            "고객이 제품을 찾아옴",
+            "언론이 연락함",
+            "입소문이 발생함",
+            "채용 수요 급증",
+            "주문 폭주",
+        ]
 
     def run(self, state: InvestmentState) -> InvestmentState:
         company = state.get("profile", {}).get("name")
@@ -116,6 +132,14 @@ class GrowthAgent:
 
     def _collect_corpus(self, company: str) -> str:
         corpus_parts: List[str] = []
+
+        # 1. DART 직원 정보 우선 시도
+        if self.dart_api_key:
+            dart_info = self._collect_dart_employee_info(company)
+            if dart_info:
+                corpus_parts.append(dart_info)
+
+        # 2. 기존 검색
         for query in self.config.discovery_queries(company):
             results = self.search(query, max_results=self.config.max_results) or []
             for item in results:
@@ -123,6 +147,7 @@ class GrowthAgent:
                 snippet = item.get("content") or item.get("snippet") or ""
                 corpus_parts.append(title)
                 corpus_parts.append(snippet)
+
         return "\n".join(part for part in corpus_parts if part)
 
     def _extract_signals(self, corpus: str) -> GrowthSignals:
@@ -169,7 +194,10 @@ class GrowthAgent:
 
         if signals.get("revenue_2023") and signals.get("revenue_2024"):
             fundamentals += self.config.fundamentals_weight * 0.5
-        if commercial_ratio is not None or signals.get("government_dependency") is not None:
+        if (
+            commercial_ratio is not None
+            or signals.get("government_dependency") is not None
+        ):
             fundamentals += self.config.fundamentals_weight * 0.25
         if contracts:
             fundamentals += self.config.fundamentals_weight * 0.25
@@ -222,14 +250,13 @@ class GrowthAgent:
             bullet = "; ".join(signals["contracts"][:3])
             lines.append(f"- 주요 계약: {bullet}")
         if self.pmf_signals:
-            lines.append(
-                "- PMF 신호 체크 포인트: "
-                + ", ".join(self.pmf_signals[:3])
-            )
+            lines.append("- PMF 신호 체크 포인트: " + ", ".join(self.pmf_signals[:3]))
 
         lines.append(
             "- 세부 점수: "
-            + ", ".join(f"{k.replace('_score', '')} {v:.1f}" for k, v in breakdown.items())
+            + ", ".join(
+                f"{k.replace('_score', '')} {v:.1f}" for k, v in breakdown.items()
+            )
         )
         return "\n".join(lines)
 
@@ -403,8 +430,212 @@ class GrowthAgent:
             return "경고"
         return "심각"
 
+    # ────────────────────────────── DART API 통합 ──────────────────────────────
+
+    def _get_corp_code(self, company_name: str) -> Optional[str]:
+        """기업명으로 DART 고유번호 조회"""
+        if not self.dart_api_key:
+            return None
+
+        # DART corpCode는 별도 XML 다운로드 필요
+        # 여기서는 하드코딩된 매핑 사용 (실제로는 corpCode.xml 파싱 필요)
+        corp_code_map = {
+            "나라스페이스": None,  # 비상장 스타트업은 없을 가능성
+            "나라스페이스테크놀로지": None,
+            # 실제 사용 시 corpCode.xml에서 추출한 매핑 사용
+        }
+
+        return corp_code_map.get(company_name)
+
+    def _collect_dart_employee_info(self, company: str) -> Optional[str]:
+        """DART에서 직원 현황 조회 및 텍스트 생성"""
+        if not self.dart_api_key:
+            return None
+
+        corp_code = self._get_corp_code(company)
+        if not corp_code:
+            print(f"[DART] {company} 고유번호 없음 - 검색으로 fallback")
+            return None
+
+        # 2024년 사업보고서 조회
+        url = "https://opendart.fss.or.kr/api/empSttus.json"
+        params = {
+            "crtfc_key": self.dart_api_key,
+            "corp_code": corp_code,
+            "bsns_year": "2024",
+            "reprt_code": "11011",  # 사업보고서
+        }
+
+        try:
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+            if data.get("status") != "000":
+                print(f"[DART] API 오류: {data.get('message')}")
+                return None
+
+            return self._parse_employee_data(company, data)
+
+        except requests.exceptions.RequestException as e:
+            print(f"[DART] 직원 현황 조회 실패: {e}")
+            return None
+        except Exception as e:
+            print(f"[DART] 파싱 실패: {e}")
+            return None
+
+    def _parse_employee_data(self, company: str, data: dict) -> str:
+        """DART 직원 현황 데이터를 텍스트로 변환"""
+        items = data.get("list", [])
+        if not items:
+            return ""
+
+        corpus_parts = []
+
+        # 직원 수 집계
+        regular_total = 0
+        contract_total = 0
+        rd_count = 0
+        avg_service_years = None
+        avg_salary = None
+
+        for item in items:
+            fo_bbm = item.get("fo_bbm", "")  # 사업부문
+            rgllbr_co = item.get("rgllbr_co", "0")  # 정규직 수
+            cnttk_co = item.get("cnttk_co", "0")  # 계약직 수
+            sm = item.get("sm", "0")  # 합계
+            avrg_cnwk_sdytrn = item.get("avrg_cnwk_sdytrn", "")  # 평균 근속연수
+            jan_salary_am = item.get("jan_salary_am", "")  # 1인평균 급여액
+
+            # 숫자 변환 (쉼표 제거)
+            def to_int(s):
+                try:
+                    return int(str(s).replace(",", "")) if s else 0
+                except:
+                    return 0
+
+            def to_float(s):
+                try:
+                    return float(str(s).replace(",", "")) if s else None
+                except:
+                    return None
+
+            # 사업부문별 집계
+            if "연구" in fo_bbm or "R&D" in fo_bbm.upper() or "개발" in fo_bbm:
+                rd_count += to_int(sm)
+            elif "전체" in fo_bbm or "합계" in fo_bbm or "계" in fo_bbm:
+                # 전체 합계 행
+                regular_total = to_int(rgllbr_co)
+                contract_total = to_int(cnttk_co)
+                avg_service_years = to_float(avrg_cnwk_sdytrn)
+                avg_salary = to_float(jan_salary_am)
+
+        # 전체가 없으면 수동 합산
+        if regular_total == 0 and contract_total == 0:
+            for item in items:
+                regular_total += to_int(item.get("rgllbr_co", "0"))
+                contract_total += to_int(item.get("cnttk_co", "0"))
+
+        total_count = regular_total + contract_total
+
+        # 텍스트 생성
+        if total_count > 0:
+            corpus_parts.append(f"[DART] {company} 직원 수: {total_count}명")
+
+            if regular_total > 0:
+                corpus_parts.append(f"정규직 {regular_total}명")
+
+            if contract_total > 0:
+                corpus_parts.append(f"계약직 {contract_total}명")
+
+            if rd_count > 0:
+                rd_ratio = rd_count / total_count if total_count > 0 else 0
+                corpus_parts.append(
+                    f"연구개발 인력 {rd_count}명 (비중 {rd_ratio*100:.1f}%)"
+                )
+
+            if avg_service_years:
+                corpus_parts.append(f"평균 근속연수: {avg_service_years:.1f}년")
+
+            if avg_salary:
+                corpus_parts.append(f"1인 평균 급여: {int(avg_salary/10000)}만원")
+
+        # 전년도 데이터 조회 (성장률 계산용)
+        prev_year_data = self._get_employee_count_for_year(
+            self._get_corp_code(company), "2023"
+        )
+
+        if prev_year_data and total_count > 0:
+            growth = (total_count - prev_year_data) / prev_year_data
+            corpus_parts.append(
+                f"직원 증가율: 전년 대비 {growth*100:.1f}% ({prev_year_data}명 → {total_count}명)"
+            )
+
+        if total_count > 0:
+            print(
+                f"[DART] ✓ 직원 정보: {total_count}명 (정규직 {regular_total}, 계약직 {contract_total})"
+            )
+
+        return "\n".join(corpus_parts)
+
+    def _get_employee_count_for_year(
+        self, corp_code: Optional[str], year: str
+    ) -> Optional[int]:
+        """특정 연도의 직원 수 조회"""
+        if not self.dart_api_key or not corp_code:
+            return None
+
+        url = "https://opendart.fss.or.kr/api/empSttus.json"
+        params = {
+            "crtfc_key": self.dart_api_key,
+            "corp_code": corp_code,
+            "bsns_year": year,
+            "reprt_code": "11011",
+        }
+
+        try:
+            response = requests.get(url, params=params, timeout=10)
+            data = response.json()
+
+            if data.get("status") != "000":
+                return None
+
+            regular_total = 0
+            contract_total = 0
+
+            for item in data.get("list", []):
+                fo_bbm = item.get("fo_bbm", "")
+                rgllbr_co = str(item.get("rgllbr_co", "0")).replace(",", "")
+                cnttk_co = str(item.get("cnttk_co", "0")).replace(",", "")
+
+                if "전체" in fo_bbm or "합계" in fo_bbm or "계" in fo_bbm:
+                    try:
+                        regular_total = int(rgllbr_co) if rgllbr_co.isdigit() else 0
+                        contract_total = int(cnttk_co) if cnttk_co.isdigit() else 0
+                    except:
+                        pass
+                    break
+
+            # 전체가 없으면 수동 합산
+            if regular_total == 0 and contract_total == 0:
+                for item in data.get("list", []):
+                    try:
+                        rgllbr = str(item.get("rgllbr_co", "0")).replace(",", "")
+                        cnttk = str(item.get("cnttk_co", "0")).replace(",", "")
+                        regular_total += int(rgllbr) if rgllbr.isdigit() else 0
+                        contract_total += int(cnttk) if cnttk.isdigit() else 0
+                    except:
+                        pass
+
+            total = regular_total + contract_total
+            return total if total > 0 else None
+
+        except:
+            return None
+
 
 # ────────────────────────────── 실행 예시 ──────────────────────────────
+
 
 def _demo() -> None:
     state = create_initial_state()

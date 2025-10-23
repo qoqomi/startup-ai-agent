@@ -1,0 +1,90 @@
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+Traceback (most recent call last):
+  File "/Users/koi/Documents/SKALA/03-project/startup-ai-agent/main.py", line 21, in main
+    final_state = run_workflow()
+                  ^^^^^^^^^^^^^^
+  File "/Users/koi/Documents/SKALA/03-project/startup-ai-agent/graph/workflow.py", line 173, in run_workflow
+    final_state = app.invoke(initial_state)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/koi/Documents/SKALA/03-project/startup-ai-agent/myenv/lib/python3.11/site-packages/langgraph/pregel/main.py", line 3094, in invoke
+    for chunk in self.stream(
+  File "/Users/koi/Documents/SKALA/03-project/startup-ai-agent/myenv/lib/python3.11/site-packages/langgraph/pregel/main.py", line 2679, in stream
+    for _ in runner.tick(
+  File "/Users/koi/Documents/SKALA/03-project/startup-ai-agent/myenv/lib/python3.11/site-packages/langgraph/pregel/_runner.py", line 167, in tick
+    run_with_retry(
+  File "/Users/koi/Documents/SKALA/03-project/startup-ai-agent/myenv/lib/python3.11/site-packages/langgraph/pregel/_retry.py", line 42, in run_with_retry
+    return task.proc.invoke(task.input, config)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/koi/Documents/SKALA/03-project/startup-ai-agent/myenv/lib/python3.11/site-packages/langgraph/_internal/_runnable.py", line 656, in invoke
+    input = context.run(step.invoke, input, config, **kwargs)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/koi/Documents/SKALA/03-project/startup-ai-agent/myenv/lib/python3.11/site-packages/langgraph/_internal/_runnable.py", line 400, in invoke
+    ret = self.func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/koi/Documents/SKALA/03-project/startup-ai-agent/graph/workflow.py", line 67, in node_tech_analysis
+    result = tech_analyzer.run(state)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/koi/Documents/SKALA/03-project/startup-ai-agent/agents/tech_analyzer.py", line 107, in run
+    raise ValueError("기업명이 필요합니다")
+ValueError: 기업명이 필요합니다
+During task with name 'tech_analysis' and id '6f2ee9d7-b7d8-d604-1488-5e2ca60cda03'
+[INFO] 평가 기준 RAG 초기화 중...
+
+[INFO] RAG 시스템 구축 중...
+[INFO] 기존 벡터 스토어 로드 중...
+[SUCCESS] 캐시 로드 완료
+
+[INFO] 평가 기준 RAG 초기화 중...
+
+[INFO] RAG 시스템 구축 중...
+[INFO] 기존 벡터 스토어 로드 중...
+[SUCCESS] 캐시 로드 완료
+
+[INFO] 평가 기준 RAG 초기화 중...
+
+[INFO] RAG 시스템 구축 중...
+[INFO] 기존 벡터 스토어 로드 중...
+[SUCCESS] 캐시 로드 완료
+
+[INFO] 평가 기준 RAG 초기화 중...
+
+[INFO] RAG 시스템 구축 중...
+[INFO] 기존 벡터 스토어 로드 중...
+[SUCCESS] 캐시 로드 완료
+
+
+🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟
+
+    AI 스타트업 투자 평가 시스템
+    AI Startup Investment Evaluation System
+
+🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟
+
+
+================================================================================
+🚀 AI 스타트업 투자 평가 시스템 시작
+================================================================================
+
+================================================================================
+🔍 [후보 선택] AI 위성(우주산업) 스타트업
+================================================================================
+📡 네이버 검색: AI 위성(우주산업) 스타트업 위성 소형화 저궤도 위성 광학위성
+   결과: 2건
+
+🤖 LLM 분석 중...
+
+✅ 선정된 후보: 0개
+
+
+❌ 오류 발생: 기업명이 필요합니다
