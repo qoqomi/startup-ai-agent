@@ -50,23 +50,24 @@ growth_rate = ((recent_avg - prev_avg) / prev_avg) * 100
 이를 통해 시장 분석 단계에서 실제 통계 기반의 신뢰도 높은 성장률을 반영할 수 있으며,
 분석 보고서의 객관성과 재현성을 동시에 확보하였습니다.
 
-## 3. 추진 계획 (Implementation Plan)
+----
 
-### 3-1. 문서 추출 및 번역 파이프라인 고도화
+## 2. 추진 계획 (Implementation Plan)
+
+### 2-1. 문서 추출 및 번역 파이프라인 고도화
 
 - `agents/report_generator.py`에서 생성된 보고서 구조를 활용하여,  신규 모듈 **`tools/pdf_parser`** 에서 **PDF를 페이지 단위로 텍스트 추출**작업 필요
 
----
 
-### 3-2. 그래프 재작성 및 시각화 자동화
+
+### 2-2. 그래프 재작성 및 시각화 자동화
 
 - `graph/workflow.py`에서 생성된 **시장·기술·생존성 분석 수치**를 **`reports/datasets/` 폴더에 CSV 형태로 집계 저장**
 - 신규 모듈 **`reporting/plot_builder.py`** 에서 데이터를 로드 후  
   **Matplotlib 기반 그래프 자동 생성 (한국어 축·범례 반영)**
 
 
-
-### 3-3. QA 및 비교 검수 체계 구축
+### 2-3. QA 및 비교 검수 체계 구축
 
 - 번역 페이지·그래프가 원문과 의미 일치 여부를 확인하기 위한  
   **QA 체크리스트(`docs/qa_checklist.md`)** 정비
