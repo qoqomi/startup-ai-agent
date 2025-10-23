@@ -1,55 +1,217 @@
-from typing import TypedDict, List, Dict, Optional, Annotated
-from operator import add
+"""
+한국 우주산업 스타트업 투자 평가 시스템
+상태(State) 정의 모듈
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from typing_extensions import TypedDict
 
 
-class AgentState(TypedDict):
-    """투자 분석 에이전트 상태"""
-
-    # 입력
-    query: str  # 사용자 검색 쿼리 (예: "AI 핀테크 스타트업")
-
-    # 1단계: 탐색
-    candidates: List[Dict]  # 후보 스타트업 리스트
-    competitors: List[Dict]  # 경쟁사 리스트
-
-    # 2단계: 검증
-    validation: Dict  # 비교 가능성 검증 결과
-    comparison_mode: str  # "absolute" or "relative"
-
-    # 3단계: 분석 (병렬)
-    tech_summary: Dict  # 기술력 분석
-    market_analysis: Dict  # 시장/고객 분석
-    survival_analysis: Dict  # 생존성 분석
-
-    # 4단계: 종합
-    final_score: Dict  # 점수 산출 결과
-    investment_decision: Dict  # 투자 판단
-    report: str  # 최종 보고서
-    document_path: str  # Word/PDF 문서 경로
-
-    # 추가: 에러 처리 & 메타데이터
-    errors: Annotated[List[str], add]  # 누적 에러 메시지
-    search_results: List[Dict]  # 웹 검색 원본 결과 (캐싱용)
-    documents: List[Dict]  # RAG 문서 (검증용)
+# ═══════════════════════════════════════════════════════════════════════════
+# Agent 0 ─ 기업 탐색 및 기본 정보
+# ═══════════════════════════════════════════════════════════════════════════
 
 
-# 초기 상태 정의
-def create_initial_state(query: str) -> AgentState:
-    """초기 상태 생성"""
-    return {
-        "query": query,
-        "candidates": [],
-        "competitors": [],
-        "validation": {},
-        "comparison_mode": "relative",
-        "tech_summary": {},
-        "market_analysis": {},
-        "survival_analysis": {},
-        "final_score": {},
-        "investment_decision": {},
-        "report": "",
-        "document_path": "",
-        "errors": [],
-        "search_results": [],
-        "documents": [],
-    }
+class CandidateProfile(TypedDict, total=False):
+    """기업 기본 정보"""
+
+    name: str
+    tagline: str
+    summary: str
+    founded_year: int
+    ceo_name: str
+    headquarters: str
+    employee_count: int
+    website: str
+    business_description: str
+
+
+class SpaceOperations(TypedDict, total=False):
+    """우주산업 특화 정보"""
+
+    satellites_deployed: int
+    satellites_planned: int
+    satellite_names: List[str]
+    payload_type: str
+    orbit_type: str
+    launch_status: str
+    ground_stations: int
+    main_technology: List[str]
+    industry_sector: str
+
+
+class FundingSnapshot(TypedDict, total=False):
+    """투자 및 파트너십"""
+
+    stage: str
+    total_funding_krw: float
+    last_funding_date: str
+    major_investors: List[str]
+    partners: List[str]
+    products: List[str]
+    customers: List[str]
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Agent 1 ─ 성장성 분석
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class GrowthSignals(TypedDict, total=False):
+    revenue_2023: float
+    revenue_2024: float
+    growth_rate: float
+    government_dependency: float
+    commercial_ratio: float
+    trl_level: int
+    contracts: List[str]
+    score_breakdown: Dict[str, float]
+    summary: str
+
+
+class GrowthOutcome(TypedDict, total=False):
+    score: float
+    analysis: GrowthSignals
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Agent 2 ─ 시장·경쟁 분석
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class MarketInsights(TypedDict, total=False):
+    global_tam_usd: float
+    korea_market_krw: float
+    market_growth_rate: float
+    pmf_signals: Dict[str, Any]
+    summary: str
+
+
+class MarketOutcome(TypedDict, total=False):
+    score: float
+    analysis: MarketInsights
+
+
+class CompetitorProfile(TypedDict, total=False):
+    name: str
+    founded_year: int
+    employees: int
+    funding_krw: float
+    satellites: int
+    technology: str
+    strengths: List[str]
+    weaknesses: List[str]
+
+
+class ComparisonSummary(TypedDict, total=False):
+    our_strengths: List[str]
+    our_weaknesses: List[str]
+    competitor_strengths: List[str]
+    competitor_weaknesses: List[str]
+    narrative: str
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Agent 3 ─ 생존성 분석
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class SurvivalMetrics(TypedDict, total=False):
+    cash_krw: float
+    burn_rate_monthly: float
+    runway_months: int
+    funding_rounds: List[Dict[str, Any]]
+    government_grants: float
+    risks: List[Dict[str, Any]]
+    summary: str
+
+
+class SurvivalOutcome(TypedDict, total=False):
+    score: float
+    analysis: SurvivalMetrics
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 최종 의사결정 및 보고서
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class DecisionSummary(TypedDict, total=False):
+    final_score: float
+    recommendation: str
+    confidence: float
+    key_insights: List[str]
+    risk_factors: List[str]
+
+
+class ReportSection(TypedDict, total=False):
+    title: str
+    body: str
+
+
+class ReportBundle(TypedDict, total=False):
+    markdown: str
+    path: str
+    sections: List[ReportSection]
+
+
+class PipelineMeta(TypedDict, total=False):
+    current_agent: str
+    stage: str
+    timestamp: str
+    processing_time: float
+    data_quality: str
+    history: List[str]
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 전체 State
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class InvestmentState(TypedDict, total=False):
+    """LangGraph/Agent 파이프라인 전체에서 공유하는 상태."""
+
+    profile: CandidateProfile
+    space: SpaceOperations
+    funding: FundingSnapshot
+    growth: GrowthOutcome
+    market: MarketOutcome
+    competitor: CompetitorProfile
+    comparison: ComparisonSummary
+    survival: SurvivalOutcome
+    decision: DecisionSummary
+    report: ReportBundle
+    meta: PipelineMeta
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 초기 State 생성
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def create_initial_state(timestamp: Optional[str] = None) -> InvestmentState:
+    """워크플로우 초기 상태."""
+
+    return InvestmentState(
+        profile={},
+        space={},
+        funding={},
+        growth={},
+        market={},
+        competitor={},
+        comparison={},
+        survival={},
+        decision={},
+        report={},
+        meta={
+            "current_agent": "agent_0",
+            "stage": "startup_search",
+            "timestamp": timestamp or datetime.utcnow().isoformat(),
+            "history": [],
+        },
+    )
